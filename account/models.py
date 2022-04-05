@@ -1,48 +1,72 @@
+from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
+from django.core.mail import send_mail
 from django.db import models
 
 
-from django.contrib.auth.base_user import BaseUserManager
-from django.contrib.auth.models import AbstractUser
-from django.db import models
 
-class MyUserManager(BaseUserManager):
-    use_in_migrations = True
-    def _create_user(self, email, password, **extra_fields):
-        email = self.normalize_email()
-        user = self.models(email=email)
+class UserManager(BaseUserManager):
+    def _create(self, email, password, name, last_name, **extra_fields):
+        if not email:
+            raise ValueError('Email cant be empty')
+        user = self.model(email=email, name=name, last_name=last_name, **extra_fields)
         user.set_password(password)
-        user.create_activation_code()
         user.save()
         return user
 
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(self, email, password, name, last_name, **extra_fields):
+        extra_fields.setdefault('is_active', False)
         extra_fields.setdefault('is_staff', False)
-        extra_fields.setdefault('is_superuser', False)
-        return self._create_user(email, password **extra_fields)
+        return self._create(email, password, name, last_name, **extra_fields)
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self, email, password, name, last_name, **extra_fields):
+        extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must hav is staff true')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('superuser must have is_superuser=True')
-        return self._create_user(email, password, **extra_fields)
+        return self._create(email, password, name, last_name, **extra_fields)
 
 
-
-
-class MyUser(AbstractUser):
-    username = None
-    email = models.EmailField(unique=True)
+class User(AbstractBaseUser):
+    email = models.EmailField(primary_key=True)
+    name = models.CharField(max_length=50)
+    last_name = models.CharField(max_length=50, blank=True)
     is_active = models.BooleanField(default=False)
-    activation_code = models.CharField(max_length=50, blank=True)
+    is_staff = models.BooleanField(default=False)
+    activation_code = models.CharField(max_length=8, blank=True)
+
+    objects = UserManager()
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
-
-
-    objects = MyUserManager()
+    REQUIRED_FIELDS = ['name', 'last_name']
 
     def __str__(self):
         return self.email
+
+    def has_module_perms(self, app_label):
+        return self.is_staff
+
+    def has_perm(self, obj):
+        return self.is_staff
+
+    @staticmethod
+    def generate_activation_code():
+        from django.utils.crypto import get_random_string
+        code = get_random_string(8)
+        return code
+
+    def set_activation_code(self):
+        code = self.generate_activation_code()
+        if User.objects.filter(activation_code=code).exists():
+            self.set_activation_code()
+        else:
+            self.activation_code = code
+            self.save()
+
+    def send_activation_mail(self):
+        message = f"""
+        Здравствуйте! Спасибо за регистрацию на нашем сайте!
+        Ваш код активации: {self.activation_code}
+        """
+        send_mail(
+            "Подтверждение аккаунта",
+            message,
+            "test@gmail.com",
+            [self.email]
+        )

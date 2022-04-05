@@ -1,10 +1,10 @@
 from django.db import models
 
-from account.models import MyUser
+from account.models import User
 
 
 class Comment(models.Model):
-    author = models.ForeignKey(MyUser, on_delete=models.CASCADE, related_name='posts')
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     text = models.TextField()
     created_at = models.DateTimeField()
 
