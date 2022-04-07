@@ -16,6 +16,20 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+from rest_framework.routers import DefaultRouter
+
+from comments.views import CommentViewSet
+from posts.views import PostsViewSet
+from django.contrib import admin
+from django.urls import path, include
+
+router = DefaultRouter()
+router.register('posts', PostsViewSet)
+router.register('comments', CommentViewSet)
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api-auth/', include('rest_framework.urls')),
+    path('v1/api/', include(router.urls)),
 ]
